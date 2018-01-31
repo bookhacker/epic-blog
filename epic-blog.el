@@ -32,6 +32,7 @@
 (defconst post-author-prefix "#+AUTHOR:")
 (defconst post-category-prefix "#+CATEGORY:")
 (defconst category-title-prefix "#+CATEGORY-TITLE:")
+(defconst category-full-title-prefix "#+CATEGORY-FULL-TITLE:")
 (defconst post-date-prefix "#+DATE:")
 (defvar post-title-prefix "#+TITLE:")
 (defvar page-title-prefix "#+TITLE:")
@@ -68,13 +69,13 @@
 (defvar category-title "")
 (defvar destination-file-name "")
 (defvar epic-blog-index-file "" "The first post file will also be the index.html.")
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-create-index-file ()
   "Creates index.html."
   (setq index-file (concat (file-name-as-directory html-directory) "index.html"))
   (copy-file epic-blog-index-file index-file t))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-build-all()
   "Builds everything."
@@ -87,7 +88,7 @@
   (epic-blog-build-all-pages)
   (epic-blog-build-all-categories)
   (epic-blog-create-index-file))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-category-create (category)
   "Builds a category file."
@@ -95,7 +96,9 @@
     (goto-char (point-min))
     (insert html-table-start-tag)(newline)
     (goto-char (point-min))
-    (insert "<h2>" (epic-blog-get-category-title category) "</h2>")(newline)
+    (insert (epic-blog-get-category-description category))(newline)    
+    (goto-char (point-min))
+    (insert "<h2>" (epic-blog-get-category-full-title category) "</h2>")(newline)
     (goto-char (point-min))
     (insert html-main-start-tag)(newline)
     (goto-char (point-min))
@@ -124,44 +127,110 @@
     (indent-region (point-min)(point-max))
     (write-file destination-category-file)
     (kill-buffer)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-build-all-categories ()
   "Builds all category files."
   (mapcar 'epic-blog-category-create epic-blog-categories-list))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-build-all-pages()
   "Builds all posts."
-  (setq page-files (find-lisp-find-files (file-name-as-directory epic-blog-source-pages-directory) "\\.page$"))
+  (setq page-files (find-lisp-find-files (file-name-as-directory
+					  epic-blog-source-pages-directory)
+					 "\\.page$"))
   (mapcar 'epic-blog-page-create page-files))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-build-all-posts()
   "Builds all posts."
-  (setq post-files (find-lisp-find-files (file-name-directory buffer-file-name) "\\.post$"))
+  (setq post-files (find-lisp-find-files (file-name-directory buffer-file-name)
+					 "\\.post$"))
   (mapcar 'epic-blog-post-create post-files))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
-(defun epic-blog-get-category-title (category)
-  "Reads category-title from category-file."
+(defun epic-blog-get-category-description (category)
+  "Reads category-full-title from category-file."
+  (setq category-description "")
   (unless (string-empty-p category)
     ;; create category page if not exists
-    (setq category-file (concat (file-name-as-directory categories-directory) category category-file-extension))
+    (setq category-file (concat (file-name-as-directory categories-directory)
+				category category-file-extension))
     (unless (file-exists-p category-file)
       (with-current-buffer (get-buffer-create category-buffer-name)
-	(setq category-title (concat category-title-prefix " TODO: " post-category))
+	(setq category-title (concat category-title-prefix
+				     " TODO: "
+				     post-category))
 	(insert category-title)(newline)
 	(write-file category-file)
 	(kill-buffer)))
     ;; read from category file
     (with-current-buffer (find-file category-file)
       (goto-char (point-min))
-      (setq line (buffer-substring-no-properties (line-beginning-position)(line-end-position)))
-      (setq category-title (string-trim (string-remove-prefix category-title-prefix line)))
+      (while (not (eobp))
+	(setq formatted-line (string-trim (epic-blog-get-current-line)))
+	(unless (string-empty-p formatted-line)
+	  (unless  (string-prefix-p "#+" formatted-line)
+	    (setq category-description (concat category-description
+					       (epic-blog-get-formatted-html
+						formatted-line)
+					       "\n"))))
+	(forward-line))
+      (kill-buffer)))
+  category-description)
+;;; -----------------------------------------------------------------------------
+;;;
+(defun epic-blog-get-category-full-title (category)
+  "Reads category-full-title from category-file."
+  (unless (string-empty-p category)
+    ;; create category page if not exists
+    (setq category-file (concat (file-name-as-directory categories-directory)
+				category category-file-extension))
+    (unless (file-exists-p category-file)
+      (with-current-buffer (get-buffer-create category-buffer-name)
+	(setq category-title (concat category-title-prefix
+				     " TODO: "
+				     post-category))
+	(insert category-title)(newline)
+	(write-file category-file)
+	(kill-buffer)))
+    ;; read from category file
+    (with-current-buffer (find-file category-file)
+      (goto-char (point-min))
+      (search-forward category-full-title-prefix nil t);
+      (setq line (buffer-substring-no-properties (line-beginning-position)
+						 (line-end-position)))
+      (setq category-full-title (string-trim (string-remove-prefix
+					      category-full-title-prefix
+					      line)))
+      (kill-buffer)
+      category-full-title)))
+;;; -----------------------------------------------------------------------------
+;;;
+(defun epic-blog-get-category-title (category)
+  "Reads category-title from category-file."
+  (unless (string-empty-p category)
+    ;; create category page if not exists
+    (setq category-file (concat (file-name-as-directory categories-directory)
+				category category-file-extension))
+    (unless (file-exists-p category-file)
+      (with-current-buffer (get-buffer-create category-buffer-name)
+	(setq category-title (concat category-title-prefix
+				     " TODO: "
+				     post-category))
+	(insert category-title)(newline)
+	(write-file category-file)
+	(kill-buffer)))
+    ;; read from category file
+    (with-current-buffer (find-file category-file)
+      (goto-char (point-min))
+      (setq line (buffer-substring-no-properties (line-beginning-position)
+						 (line-end-position)))
+      (setq category-title (string-trim (string-remove-prefix
+					 category-title-prefix line)))
       (kill-buffer)
       category-title)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-post-insert-head-file ()
   "Insert head-file content into new post-file."
@@ -169,7 +238,7 @@
 			epic-blog-post-buffer-name)
     (goto-char 1)
     (insert-file-contents head-file)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-process-post-file (file-name)
   "Creates new post from .post-file."
@@ -184,7 +253,7 @@
   (epic-blog-post-insert-footer)
   (epic-blog-post-replace-title)
   (epic-blog-post-write-file destination-file-name))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-post-create (filename)
   "Creates an epic-blog-post."
@@ -233,7 +302,7 @@
   ;;   (setq index-file-name (concat (file-name-as-directory html-directory) "index.html"))
   ;;   (copy-file destination-file-name index-file-name t))
   )
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-insert-on-pages-page ()
   "Inserts current post on pages page."
@@ -242,12 +311,12 @@
     (insert "<article>")(newline)
     (setq category-element (concat "<span class=\"blog-category-links\"><a href=\"" category-link "\">" category-title "</a></span>"))
     (setq formatted-post-date (epic-blog-get-formatted-post-date))
-    (setq date-element (concat "<span class=\"post-data\">Veröffentlicht: " formatted-post-date "</span>")) 
+    (setq date-element (concat "<span class=\"post-data\">Veröffentlicht: " formatted-post-date "</span>"))
     (insert (concat category-element  " · " date-element))(newline)
     (insert (concat "<h2><a href=\"" destination-file-name "\">" post-title "</a></h2>"))(newline)
     (insert post-content)
     (insert "</article>")(newline)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-page-buffer-add-line-break ()
   "Adds line break to previous line."
@@ -257,7 +326,7 @@
     (goto-char (line-end-position))
     (insert html-line-break)
     (goto-char (point-max))))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-page-buffer-add-paragraph-suffix ()
   "Adds paragraph-suffix to previous line."
@@ -267,7 +336,7 @@
     (goto-char (line-end-position))
     (insert html-paragraph-suffix)
     (goto-char (point-max))))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-page-create (filename)
   "Creates an epic-blog-page."
@@ -276,7 +345,7 @@
   (epic-blog-page-insert-footer)  
   (epic-blog-page-replace-title)
   (epic-blog-page-write-file filename))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-page-insert-content (filename)
   "Inserts file content into page-buffer."
@@ -287,7 +356,7 @@
     (epic-blog-iterate-page-buffer)
     (epic-blog-write-to-page-buffer html-main-end-tag)    
     (kill-buffer epic-blog-page-file-buffer-name)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-page-insert-featured-image ()
   "Insert featured-image part to page-buffer."
@@ -296,7 +365,7 @@
     (epic-blog-write-to-page-buffer (concat "<img id=\"featured-image\" src=\"" (file-name-as-directory uploads-directory) "rubens-medusa.jpg\" style=\"width:100%;\">"))
     (epic-blog-write-to-page-buffer "<div class=\"bottom-left\"><h1 class=\"site-title\"><a href=\"index.html\" class=\"site-title\">BASTIAN BRINKMANN</a></h1>\n<p class=\"site-subtitle\">... schreibt.</p></div>")
     (epic-blog-write-to-page-buffer "</div>")))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-post-insert-featured-image ()
   "Insert featured-image part to post-buffer."
@@ -305,7 +374,7 @@
     (epic-blog-post-insert-line (concat "<img id=\"featured-image\" src=\"" (file-name-as-directory uploads-directory) "rubens-medusa.jpg\" style=\"width:100%;\">"))
     (epic-blog-post-insert-line "<div class=\"bottom-left\"><h1 class=\"site-title\"><a href=\"index.html\" class=\"site-title\">BASTIAN BRINKMANN</a></h1>\n<p class=\"site-subtitle\">... schreibt.</p></div>")
     (epic-blog-post-insert-line "</div>")))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-page-insert-head ()
   "Inserts upper part of page."
@@ -313,7 +382,7 @@
   (epic-blog-write-to-page-buffer html-body-start-tag)
   (epic-blog-write-to-page-buffer "<div id=\"page\">")
   (epic-blog-page-insert-featured-image))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-finish-index-page()
   "Writes index-page-buffer to file."
@@ -323,12 +392,12 @@
     (epic-blog-index-page-insert-footer)
     (epic-blog-index-page-replace-title)
     (epic-blog-write-index-page-file)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-get-current-line()
   "Returns the current line of cursor position."
   (buffer-substring-no-properties (line-beginning-position)(line-end-position)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-get-formatted-html (line)
   "Returns a html-formatted version of line."
@@ -346,7 +415,7 @@
     (unless (string-suffix-p ">" formatted-line)
       (setq formatted-line (concat formatted-line html-paragraph-end-tag))))
   formatted-line)
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-get-formatted-post-date ()
   "Returns the formatted-post-date (dd.mm.yyyy-formatted)."
@@ -356,7 +425,7 @@
   (setq day (nth 2 date-elements))
   (setq formatted-post-date (concat day "." month "." year))
   formatted-post-date)
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-get-post-author(line)
   "Return author name from line."
@@ -365,7 +434,7 @@
     (setq author-name (string-remove-prefix post-author-prefix line))
     (setq author-name (string-trim author-name)))
   author-name)
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-html-apply-bold (line)
   "Replaces * with html-bold-start-tag and html-bold-end-tag."
@@ -386,7 +455,7 @@
     (setq index (+ index 1)))
   (setq line new-string)
   line)
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-html-apply-italics (line)
   "Replaces # with italics-prefx and italics-postfix."
@@ -407,28 +476,28 @@
     (setq index (+ index 1)))
   (setq line new-string)
   line)
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-post-insert-line (line)
   "Inserts line into post-buffer."
   (with-current-buffer (get-buffer-create epic-blog-post-buffer-name)
     (goto-char (point-max))
     (insert line)(newline)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-html-insert-line (line)
   "Inserts formatted-line into html-buffer."
   (with-current-buffer (get-buffer-create epic-blog-html-buffer-name)
     (goto-char (point-max))
     (insert line)(newline)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-index-page-close-main-tag()
   "Closes <main>-Tag of index-page."
   (with-current-buffer (get-buffer-create epic-blog-index-page-buffer-name)
     (goto-char (point-max))
     (insert html-main-end-tag)(newline)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-index-page-insert-footer()
   "Inserts footer-file into index-page."
@@ -440,7 +509,7 @@
     (goto-char (point-max))
     (insert html-body-end-tag)(newline)
     (insert html-end-tag)(newline)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-index-page-insert-head()
   "Inserts head-file content."
@@ -448,14 +517,14 @@
     (goto-char 1)
     (insert-file-contents head-file)))
 
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-index-page-insert-header()
   "Inserts header-file content."
   (with-current-buffer (get-buffer-create epic-blog-index-page-buffer-name)
     (goto-char (point-max))
     (insert-file-contents header-file)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-index-page-insert-pagination()
   "Inserts pagination to index-page."
@@ -467,7 +536,7 @@
     (insert (concat "<section id=\"pagination\">\n" index-page-next-page-navigation-element "\n</section>"))(newline)    
     ;;(insert "</div>")(newline)
     ))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-index-page-replace-title()
   "Sets title of index-page."
@@ -477,7 +546,7 @@
       (search-forward title-placeholder nil t) ; title in <head>
       (replace-match (concat html-title-start-tag epic-blog-website-title html-title-end-tag))
       (goto-char (point-max)))))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-initialize()
   "Initializes the environment for epic-blog-mode."
@@ -496,7 +565,7 @@
   (defconst pages-footer-file (expand-file-name "pages-footer.html" includes-directory))
   (defconst sidebar-file (expand-file-name "sidebar.html" includes-directory))
   (defconst epic-blog-index-page-file-name (expand-file-name "index.html" html-directory)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-post-insert-content (filename)
   "Inserts post-content."
@@ -508,7 +577,7 @@
     (epic-blog-post-insert-pagination)
     (epic-blog-post-insert-line html-main-end-tag)
     (kill-buffer epic-blog-post-file-buffer-name)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-post-insert-footer()
   "Inserts footer-file content."
@@ -519,7 +588,7 @@
     (epic-blog-post-insert-line "</div>")
     (epic-blog-post-insert-line html-body-end-tag)
     (epic-blog-post-insert-line html-end-tag)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-post-insert-pagination ()
   "Inserts pagination placeholders in post."
@@ -555,7 +624,7 @@
       (insert epic-blog-next-page-placeholder))
     (newline)
     (insert "</section>")(newline)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-insert-head-file ()
   "Inserts head-file content."
@@ -563,7 +632,7 @@
 			epic-blog-html-buffer-name)
     (goto-char (point-min))
     (insert-file-contents head-file)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-insert-pages-footer()
   "Inserts footer-file content."
@@ -573,7 +642,7 @@
     (insert-file-contents pages-footer-file)
     (epic-blog-html-insert-line html-body-end-tag)
     (epic-blog-html-insert-line html-end-tag)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-iterate-page-buffer ()
   "Iterates over page file."
@@ -619,7 +688,7 @@
     (when in-paragraph
       (epic-blog-page-buffer-add-paragraph-suffix)
       (setq in-paragraph nil))))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-iterate-post-buffer()
   (setq lines-iterated 0)
@@ -692,7 +761,7 @@
 	(setq last-line formatted-line)))
       (setq lines-iterated (+ lines-iterated 1))
       (forward-line))))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-page-insert-footer()
   "Inserts footer-file content."
@@ -703,7 +772,7 @@
   (epic-blog-write-to-page-buffer html-div-end-tag)
   (epic-blog-write-to-page-buffer html-body-end-tag)
   (epic-blog-write-to-page-buffer html-end-tag))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-page-insert-head-file ()
   "Inserts head-file into page-buffer."
@@ -711,7 +780,7 @@
 			epic-blog-page-buffer-name)
     (goto-char 1)
     (insert-file-contents head-file)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-page-replace-title ()
   "Sets title of target-html-site."
@@ -736,7 +805,7 @@
 	(search-forward old-main-element nil t)
 	(replace-match new-main-element)	
 	(goto-char (point-max))))))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-page-write-file (filename)
   "Creates destination filename from filename and saves 
@@ -758,7 +827,7 @@ page."
     (indent-region (point-min)(point-max))
     (write-file destination-file-name nil)
     (kill-buffer)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-post-replace-title()
   "Sets title of target-html-site."
@@ -807,7 +876,7 @@ page."
 	(search-forward old-main-element nil t)
 	(replace-match new-main-element)	
 	(goto-char (point-max))))))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-create-new-pages-page()
   "Opens an buffer to creates a new pages page for pagination."
@@ -829,7 +898,7 @@ page."
       (goto-char (point-max))
       (insert "</aside>")(newline))
     (insert html-main-start-tag)(newline)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-finish-new-pages-page()
   "Writes new pages-buffer to file."
@@ -883,7 +952,7 @@ page."
 	(make-directory (file-name-as-directory epic-blog-pages-directory-name)))  
       (write-file new-page-filename nil)
       (kill-buffer))))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-start-index-page()
   "Opens an buffer to create an index-page."
@@ -905,7 +974,7 @@ page."
       (goto-char (point-max))
       (insert "</aside>")(newline))
     (insert html-main-start-tag)(newline)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-post-write-file (destination-file-name)
   "Writes html-buffer to a file."
@@ -914,7 +983,7 @@ page."
     (indent-region (point-min)(point-max))
     (write-file destination-file-name nil)
     (kill-buffer)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-write-index-page-file()
   "Writes index-page-file."
@@ -923,14 +992,14 @@ page."
     (indent-region (point-min)(point-max))
     (write-file epic-blog-index-page-file-name nil)
     (kill-buffer)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-write-to-page-buffer (line)
   "Writes line to page-buffer."
   (with-current-buffer (get-buffer-create epic-blog-page-buffer-name)
     (goto-char (point-max))
     (insert line)(newline)))
-;;; ---------------------------------------------------------
+;;; -----------------------------------------------------------------------------
 ;;; Tests
 ;;;
 (load "epic-blog-tests.el")
