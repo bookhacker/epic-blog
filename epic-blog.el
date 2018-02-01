@@ -2,6 +2,9 @@
 (require 'find-lisp)
 (require 'subr-x)
 
+(defconst epic-blog-i18n-next-page     "← nächste Seite")
+(defconst epic-blog-i18n-previous-page "vorherige Seite →")
+
 (defvar category-link "")
 (defvar html-line-break "<br>")
 (defvar html-paragraph-prefix "<p>")
@@ -107,6 +110,7 @@
     (insert html-body-start-tag)(newline)
     (goto-char (point-min))
     (insert-file-contents pages-head-file)(newline)
+    (epic-blog-category-replace-title category)
     ;; featured-image
     (goto-char (point-max))
     (insert html-table-end-tag)(newline)
@@ -530,12 +534,20 @@
   "Inserts pagination to index-page."
   (with-current-buffer (get-buffer-create epic-blog-index-page-buffer-name)
     (goto-char (point-max))
-    (setq index-page-next-page (concat (file-name-as-directory epic-blog-pages-directory-name) (number-to-string epic-blog-pages-counter) html-extension))
-    (setq index-page-next-page-navigation-element (concat "<a rel=\"next\" href=\"" index-page-next-page "\" class=\"next-page\">nächste Seite →</a>"))
-        ;;(setq index-page-next-page-navigation-element (concat "<a rel=\"next\" href=\"" index-page-next-page "\" class=\"next-page\">→</a>"))
-    (insert (concat "<section id=\"pagination\">\n" index-page-next-page-navigation-element "\n</section>"))(newline)    
-    ;;(insert "</div>")(newline)
-    ))
+    (setq index-page-next-page (concat (file-name-as-directory
+					epic-blog-pages-directory-name)
+				       (number-to-string epic-blog-pages-counter)
+				       html-extension))
+    (setq index-page-next-page-navigation-element (concat
+						   "<a rel=\"next\" href=\""
+						   index-page-next-page
+						   "\" class=\"next-page\">"
+						   epic-blog-i18n-previous-page
+						   "</a>"))
+    (insert (concat "<section id=\"pagination\">\n"
+		    index-page-next-page-navigation-element
+		    "\n</section>"))
+    (newline)))
 ;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-index-page-replace-title()
@@ -607,7 +619,8 @@
 	      (concat "<a rel=\"next\" href=\""
 		      destination-file-name
 		      "\" class=\"next-page\">"
-		      "nächste Seite →</a>"))	  
+		      epic-blog-i18n-previous-page
+		      "</a>"))	  
 	(search-forward epic-blog-next-page-placeholder nil t)
 	(replace-match next-page-element t)
 	(write-file epic-blog-previous-destination-filename)
@@ -616,7 +629,8 @@
 	    (concat "<a rel=\"prev\" href=\""
 		    epic-blog-previous-destination-filename
 		    "\" class=\"previous-page\">"
-		    "← vorherige Seite</a>"))
+		    epic-blog-i18n-next-page
+		    "</a>"))
       ;;)
       (insert previous-page-element " ")
       )
@@ -782,6 +796,20 @@
     (insert-file-contents head-file)))
 ;;; -----------------------------------------------------------------------------
 ;;;
+(defun epic-blog-category-replace-title (category)
+  "Sets title of category page."
+  (unless (string-empty-p category)
+    (setq new-title-element (concat html-title-start-tag
+				    (epic-blog-get-category-title category)
+				    html-title-end-tag))
+    (with-current-buffer (get-buffer-create category)
+      (let ((case-fold-search t)) ; or nil
+	(goto-char (point-min))
+					; title in <head>
+	(search-forward title-placeholder nil t)
+	(replace-match new-title-element)))))
+;;; -----------------------------------------------------------------------------
+;;;
 (defun epic-blog-page-replace-title ()
   "Sets title of target-html-site."
   (unless (string-empty-p page-title)
@@ -909,27 +937,59 @@ page."
       ;; previous-page
       (if (= epic-blog-pages-counter 2)
 	  (progn
-	    (setq next-page (concat (number-to-string epic-blog-pages-counter) html-extension))
-	    	    (setq next-page-navigation-element (concat "<a rel=\"next\" href=\"" next-page "\" class=\"next-page\">nächste Seite →</a>"))
-;;	    	    (setq next-page-navigation-element (concat "<a rel=\"next\" href=\"" next-page "\" class=\"next-page\">→</a>"))
-	    (insert (concat "<section id=\"pagination\">\n" next-page-navigation-element "\n</section>"))(newline))
+	    (setq next-page (concat (number-to-string epic-blog-pages-counter)
+				    html-extension))
+	    (setq next-page-navigation-element (concat "<a rel=\"next\" href=\""
+						       next-page
+						       "\" class=\"next-page\">"
+						       epic-blog-i18n-previous-page
+						       "</a>"))
+	    (insert (concat "<section id=\"pagination\">\n"
+			    next-page-navigation-element
+			    "\n</section>"))
+	    (newline))
 	(if (= epic-blog-posts-counter (length post-files))
 	    (progn
-	      (setq previous-page (concat (number-to-string (- epic-blog-pages-counter 1)) html-extension))
-	      	      (setq previous-page-navigation-element (concat "<a rel=\"prev\" href=\"" previous-page "\" class=\"previous-page\">← vorherige Seite</a>"))
-	      ;;	      (setq previous-page-navigation-element (concat "<a rel=\"prev\" href=\"" previous-page "\" class=\"previous-page\">←</a>"))
-	      (insert (concat "<section id=\"pagination\">\n" previous-page-navigation-element "\n</section>"))(newline))
+	      (setq previous-page (concat (number-to-string
+					   (- epic-blog-pages-counter 1))
+					  html-extension))
+	      (setq previous-page-navigation-element
+		    (concat
+		     "<a rel=\"prev\" href=\""
+		     previous-page
+		     "\" class=\"previous-page\">"
+		     epic-blog-i18n-next-page
+		       "</a>"))
+	      (insert (concat "<section id=\"pagination\">\n"
+			      previous-page-navigation-element
+			      "\n</section>"))
+	      (newline))
 	  (progn
 	    (if (= epic-blog-pages-counter 3)
 		(setq previous-page epic-blog-index-page-file-name)
-	      (setq previous-page (concat (number-to-string (- epic-blog-pages-counter 2)) html-extension)))
-	    	    (setq previous-page-navigation-element (concat "<a rel=\"prev\" href=\"" previous-page "\" class=\"previous-page\">← vorherige Seite</a>"))
-	    ;;	    (setq previous-page-navigation-element (concat "<a rel=\"prev\" href=\"" previous-page "\" class=\"previous-page\">←</a>"))
-	    (setq next-page (concat (number-to-string epic-blog-pages-counter) html-extension))
-	    	    (setq next-page-navigation-element (concat "<a rel=\"next\" href=\"" next-page "\" class=\"next-page\">nächste Seite →</a>"))
-	    ;;	    (setq next-page-navigation-element (concat "<a rel=\"next\" href=\"" next-page "\" class=\"next-page\">→</a>"))
-	    (insert (concat "<section id=\"pagination\">\n" previous-page-navigation-element next-page-navigation-element "\n</section>"))(newline))))
-;;      (insert "</div>")(newline)
+	      (setq previous-page (concat (number-to-string
+					   (- epic-blog-pages-counter 2))
+					  html-extension)))
+	    (setq previous-page-navigation-element
+		  (concat
+		   "<a rel=\"prev\" href=\""
+		   previous-page
+		   "\" class=\"previous-page\">"
+		   epic-blog-i18n-next-page
+		     "</a>"))
+	    (setq next-page (concat (number-to-string epic-blog-pages-counter)
+				    html-extension))
+	    (setq next-page-navigation-element (concat "<a rel=\"next\" href=\""
+						       next-page
+						       "\" class=\"next-page\">"
+						       epic-blog-i18n-previous-page
+						       "</a>"))
+	    (insert (concat "<section id=\"pagination\">\n"
+			    previous-page-navigation-element
+			    next-page-navigation-element
+			    "\n</section>"))
+	    (newline))))
+      ;;      (insert "</div>")(newline)
       ;; close main-tag
       (insert html-main-end-tag)(newline)
       ;; insert footer
@@ -942,12 +1002,19 @@ page."
       (let ((case-fold-search t)) ; or nil
 	(goto-char (point-min))
 	(search-forward title-placeholder nil t) ; title in <head>
-	(replace-match (concat html-title-start-tag epic-blog-website-title html-title-end-tag))
+	(replace-match (concat html-title-start-tag epic-blog-website-title
+			       html-title-end-tag))
 	(goto-char (point-max)))
       ;; write file
       (funcall 'html-mode)
       (indent-region (point-min)(point-max))
-      (setq new-page-filename (concat (file-name-as-directory html-directory) (file-name-as-directory epic-blog-pages-directory-name) (number-to-string (/ epic-blog-posts-counter epic-blog-posts-per-page)) html-extension))
+      (setq new-page-filename (concat (file-name-as-directory html-directory)
+				      (file-name-as-directory
+				       epic-blog-pages-directory-name)
+				      (number-to-string
+				       (/ epic-blog-posts-counter
+					  epic-blog-posts-per-page))
+				      html-extension))
       (unless (file-directory-p epic-blog-pages-directory-name)
 	(make-directory (file-name-as-directory epic-blog-pages-directory-name)))  
       (write-file new-page-filename nil)
@@ -964,8 +1031,14 @@ page."
     ;; featured image
     (when epic-blog-show-featured-image
       (insert "<div class=\"featured-image-container\">")(newline)
-      (insert (concat "<img id=\"featured-image\" src=\"" (file-name-as-directory uploads-directory) "rubens-medusa.jpg\" style=\"width:100%;\">"))(newline)
-      (insert "<div class=\"bottom-left\"><h1 class=\"site-title\"><a href=\"index.html\" class=\"site-title\">BASTIAN BRINKMANN</a></h1>\n<p class=\"site-subtitle\">... schreibt.</p></div>")(newline)
+      (insert (concat "<img id=\"featured-image\" src=\"" (file-name-as-directory
+							   uploads-directory)
+		      "rubens-medusa.jpg\" style=\"width:100%;\">"))
+      (newline)
+      (insert "<div class=\"bottom-left\"><h1 class=\"site-title\">"
+	      "<a href=\"index.html\" class=\"site-title\">BASTIAN BRINKMANN</a>"
+	      "</h1>\n<p class=\"site-subtitle\">... schreibt.</p></div>")
+      (newline)
       (insert "</div>")(newline))
     ;; sidebar
     (when epic-blog-show-sidebar      
