@@ -281,8 +281,8 @@
     (with-current-buffer (get-buffer-create post-category)
       (goto-char (point-min))
       (setq formatted-post-date (epic-blog-get-formatted-post-date))
-      (setq date-element (concat "<td class=\"post-data\">" formatted-post-date "</td>"))
-      (setq title-element (concat "<td><a href=\"" destination-file-name "\">" post-title "</a></td>"))
+      (setq date-element (concat "<td class=\"post-data\">" formatted-post-date "</td>"))      
+      (setq title-element (concat "<td><a href=\"" (concat (file-name-as-directory "..") (file-name-nondirectory destination-file-name)) "\">" post-title "</a></td>"))
       (insert "<tr>")(newline)
       (insert date-element title-element)(newline)
       (insert "</tr>")(newline)))  
@@ -643,7 +643,7 @@
 	(goto-char (point-min))
 	(setq next-page-element
 	      (concat "<a rel=\"next\" href=\""
-		      destination-file-name
+		      (file-name-nondirectory destination-file-name)
 		      "\" class=\"next-page\">"
 		      epic-blog-i18n-previous-page
 		      "</a>"))	  
@@ -653,7 +653,8 @@
 	(kill-buffer))
       (setq previous-page-element
 	    (concat "<a rel=\"prev\" href=\""
-		    epic-blog-previous-destination-filename
+		    ;; epic-blog-previous-destination-filename
+		    (file-name-nondirectory epic-blog-previous-destination-filename)
 		    "\" class=\"previous-page\">"
 		    epic-blog-i18n-next-page
 		    "</a>"))
