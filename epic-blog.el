@@ -1,10 +1,12 @@
 ;;; -*- mode:emacs-lisp;coding:utf-8 -*-
+;;; -----------------------------------------------------------------------------
+;;;
 (require 'find-lisp)
 (require 'subr-x)
-
+;;; -----------------------------------------------------------------------------
+;;;
 (defconst epic-blog-i18n-next-page     "← nächste Seite")
 (defconst epic-blog-i18n-previous-page "vorherige Seite →")
-
 (defvar category-link "")
 (defvar html-line-break "<br>")
 (defvar html-paragraph-prefix "<p>")
@@ -30,7 +32,6 @@
 (defvar   epic-blog-headlines-only t)
 (defconst epic-blog-index-page-buffer-name "index-page-buffer")
 (defconst epic-blog-index-page-title "Übersicht")
-(defconst epic-blog-website-title "My new website")
 (defvar in-paragraph nil "Are we editing a paragraph?")
 (defconst post-author-prefix "#+AUTHOR:")
 (defconst post-category-prefix "#+CATEGORY:")
@@ -72,12 +73,21 @@
 (defvar category-title "")
 (defvar destination-file-name "")
 (defvar epic-blog-index-file "" "The first post file will also be the index.html.")
+(defvar epic-blog-website-title "")
 ;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-create-index-file ()
   "Creates index.html."
   (setq index-file (concat (file-name-as-directory html-directory) "index.html"))
-  (copy-file epic-blog-index-file index-file t))
+  (copy-file epic-blog-index-file index-file t)
+  (with-current-buffer (find-file index-file)
+    (let ((case-fold-search t)) ; or nil
+      (goto-char (point-min))
+      (search-forward html-title-start-tag nil t) ; title in <head>
+      (kill-line)
+      (insert epic-blog-website-title html-title-end-tag))
+    (write-file index-file)
+    (kill-buffer)))
 ;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-build-all()
@@ -244,7 +254,7 @@
     (insert-file-contents head-file)))
 ;;; -----------------------------------------------------------------------------
 ;;;
-(defun epic-blog-process-post-file (file-name)
+(defun epic-blog-process-post-file (filename)
   "Creates new post from .post-file."
   (setq new-post-file-name-base (file-name-base filename))
   (setq new-post-file-name-base (substring new-post-file-name-base 11 (length new-post-file-name-base)))
@@ -261,7 +271,8 @@
 ;;;
 (defun epic-blog-post-create (filename)
   "Creates an epic-blog-post."
-  (epic-blog-process-post-file file-name)
+  (setq post-date (substring (file-name-base filename) 0 10))
+  (epic-blog-process-post-file filename)
   ;; insert on category page
   (unless (string-empty-p post-category)
     (unless (get-buffer post-category)
@@ -367,7 +378,7 @@
   (when epic-blog-show-featured-image
     (epic-blog-write-to-page-buffer "<div class=\"featured-image-container\">")
     (epic-blog-write-to-page-buffer (concat "<img id=\"featured-image\" src=\"" (file-name-as-directory uploads-directory) "rubens-medusa.jpg\" style=\"width:100%;\">"))
-    (epic-blog-write-to-page-buffer "<div class=\"bottom-left\"><h1 class=\"site-title\"><a href=\"index.html\" class=\"site-title\">BASTIAN BRINKMANN</a></h1>\n<p class=\"site-subtitle\">... schreibt.</p></div>")
+    (epic-blog-write-to-page-buffer "<div class=\"bottom-left\"><h1 class=\"site-title\"><a href=\"index.html\" class=\"site-title\">" epic-blog-website-title "</a></h1>\n<p class=\"site-subtitle\">... schreibt.</p></div>")
     (epic-blog-write-to-page-buffer "</div>")))
 ;;; -----------------------------------------------------------------------------
 ;;;
@@ -376,7 +387,7 @@
   (when epic-blog-show-featured-image
     (epic-blog-post-insert-line "<div class=\"featured-image-container\">")
     (epic-blog-post-insert-line (concat "<img id=\"featured-image\" src=\"" (file-name-as-directory uploads-directory) "rubens-medusa.jpg\" style=\"width:100%;\">"))
-    (epic-blog-post-insert-line "<div class=\"bottom-left\"><h1 class=\"site-title\"><a href=\"index.html\" class=\"site-title\">BASTIAN BRINKMANN</a></h1>\n<p class=\"site-subtitle\">... schreibt.</p></div>")
+    (epic-blog-post-insert-line "<div class=\"bottom-left\"><h1 class=\"site-title\"><a href=\"index.html\" class=\"site-title\">" epic-blog-website-title "</a></h1>\n<p class=\"site-subtitle\">... schreibt.</p></div>")
     (epic-blog-post-insert-line "</div>")))
 ;;; -----------------------------------------------------------------------------
 ;;;
@@ -555,15 +566,29 @@
   (with-current-buffer (get-buffer-create epic-blog-index-page-buffer-name)
     (let ((case-fold-search t)) ; or nil
       (goto-char (point-min))
-      (search-forward title-placeholder nil t) ; title in <head>
-      (replace-match (concat html-title-start-tag epic-blog-website-title html-title-end-tag))
-      (goto-char (point-max)))))
+      ;; (search-forward title-placeholder nil t) ; title in <head>
+      (search-forward html-title-start-tag nil t) ; title in <head>
+      (line-beginning-position)
+      (kill-line)
+      (insert html-title-start-tag epic-blog-website-title html-title-end-tag))
+      (goto-char (point-max))))
+;;; -----------------------------------------------------------------------------
+;;;
+(defun epic-blog-load-configuration-file ()
+  "Loads configuration file."
+  (setq epic-blog-configuration-file-name (concat
+					  (file-name-as-directory
+					   epic-blog-root-directory)					  
+					  ".epic-blog"))
+       (load epic-blog-configuration-file-name))
 ;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-initialize()
   "Initializes the environment for epic-blog-mode."
   (setq epic-blog-posts-counter 0)
   (setq epic-blog-pages-counter 1)
+  (defconst epic-blog-root-directory (expand-file-name "../../"))
+  (epic-blog-load-configuration-file)
   (defconst html-directory (expand-file-name "../../html"))
   (defconst uploads-directory "uploads")
   (defconst includes-directory (expand-file-name "../includes"))
@@ -757,10 +782,12 @@
 
 	
 	)
-       ((string-prefix-p post-date-prefix formatted-line)
-	(setq post-date (string-trim (string-remove-prefix
-				      post-date-prefix
-				      formatted-line))))
+       
+       ;; ((string-prefix-p post-date-prefix formatted-line)
+       ;; 	(setq post-date (string-trim (string-remove-prefix
+       ;; 				      post-date-prefix
+       ;; 				      formatted-line))))
+       
        ((string-prefix-p post-title-prefix formatted-line)
 	(setq post-title (string-trim (string-remove-prefix
 				       post-title-prefix
@@ -869,21 +896,11 @@ page."
 	(replace-match (concat html-title-start-tag
 			       post-title
 			       html-title-end-tag))
-	;;	(setq category-link "category.html")
 	(setq category-element
 	      (concat
 	       "<span class=\"blog-category-links\">"
 	       "<a href=\"" category-link "\">"
 	       category-title "</a></span>"))
-
-
-	;; 	  (setq category-element (concat "<span class=\"blog-category-links\"><a href=\"" category-link "\">" category-title "</a></span>"))
-	;; 	  (setq formatted-post-date (epic-blog-get-formatted-post-date))
-	;; 	  (setq date-element (concat "<span class=\"post-data\">Veröffentlicht: " formatted-post-date "</span>")) 
-	;; 	  (insert (concat category-element  " · " date-element))(newline)
-
-
-	
 	(setq title-element (concat "<h2>"
 				    post-title
 				    "</h2>"))
@@ -917,7 +934,7 @@ page."
     (when epic-blog-show-featured-image
       (insert "<div class=\"featured-image-container\">")(newline)
       (insert (concat "<img id=\"featured-image\" src=\"../" (file-name-as-directory uploads-directory) "rubens-medusa.jpg\" style=\"width:100%;\">"))(newline)
-      (insert "<div class=\"bottom-left\"><h1 class=\"site-title\"><a href=\"../index.html\" class=\"site-title\">BASTIAN BRINKMANN</a></h1>\n<p class=\"site-subtitle\">... schreibt.</p></div>")(newline)
+      (insert "<div class=\"bottom-left\"><h1 class=\"site-title\"><a href=\"../index.html\" class=\"site-title\">" epic-blog-website-title "</a></h1>\n<p class=\"site-subtitle\">... schreibt.</p></div>")(newline)
       (insert "</div>")(newline))
     ;; sidebar
     (when epic-blog-show-sidebar
@@ -1036,7 +1053,7 @@ page."
 		      "rubens-medusa.jpg\" style=\"width:100%;\">"))
       (newline)
       (insert "<div class=\"bottom-left\"><h1 class=\"site-title\">"
-	      "<a href=\"index.html\" class=\"site-title\">BASTIAN BRINKMANN</a>"
+	      "<a href=\"index.html\" class=\"site-title\">" epic-blog-website-title "</a>"
 	      "</h1>\n<p class=\"site-subtitle\">... schreibt.</p></div>")
       (newline)
       (insert "</div>")(newline))
