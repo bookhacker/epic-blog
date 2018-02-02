@@ -80,14 +80,15 @@
   "Creates index.html."
   (setq index-file (concat (file-name-as-directory html-directory) "index.html"))
   (copy-file epic-blog-index-file index-file t)
-  (with-current-buffer (find-file index-file)
-    (let ((case-fold-search t)) ; or nil
-      (goto-char (point-min))
-      (search-forward html-title-start-tag nil t) ; title in <head>
-      (kill-line)
-      (insert epic-blog-website-title html-title-end-tag))
-    (write-file index-file)
-    (kill-buffer)))
+  (unless (string-empty-p epic-blog-website-title)
+    (with-current-buffer (find-file index-file)
+      (let ((case-fold-search t)) ; or nil
+	(goto-char (point-min))
+	(search-forward html-title-start-tag nil t) ; title in <head>
+	(kill-line)
+	(insert epic-blog-website-title html-title-end-tag))
+      (write-file index-file)
+      (kill-buffer))))
 ;;; -----------------------------------------------------------------------------
 ;;;
 (defun epic-blog-build-all()
